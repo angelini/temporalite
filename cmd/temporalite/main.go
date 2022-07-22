@@ -9,7 +9,9 @@ import (
 	goLog "log"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/urfave/cli/v2"
 	"go.temporal.io/server/common/config"
@@ -261,6 +263,8 @@ func buildCLI() *cli.App {
 					return err
 				}
 
+				handleExitSignals(s)
+
 				if err := s.Start(); err != nil {
 					return cli.Exit(fmt.Sprintf("Unable to start server. Error: %v", err), 1)
 				}
@@ -270,6 +274,16 @@ func buildCLI() *cli.App {
 	}
 
 	return app
+}
+
+func handleExitSignals(s *temporalite.Server) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		s.Stop()
+		cli.Exit("Process interrupted, all services are stopped", 0)
+	}()
 }
 
 func getPragmaMap(input []string) (map[string]string, error) {
